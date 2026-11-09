@@ -1,0 +1,6 @@
+@Facturador.Api_HostAddress = http://localhost:5073
+
+GET {{Facturador.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
