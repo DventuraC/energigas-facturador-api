@@ -70,28 +70,44 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
         var tamano = Math.Clamp(filtro.TamanoPagina, 1, 100);
         var items = await documentos.OrderByDescending(x => x.Fecha).ThenByDescending(x => x.Op).Skip((pagina - 1) * tamano).Take(tamano)
             .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones)).ToListAsync(ct);
-        return new(items, total, pagina, tamano);
+        // Fetch all details for the current page in batches, never one request per document.
+        var ventaOps = items.Where(x => x.Origen == "Venta").Select(x => x.Op).Distinct().ToArray();
+        var creditoOps = items.Where(x => x.Origen == "Nota de crédito").Select(x => x.Op).Distinct().ToArray();
+        var lineasVenta = await db.DocVentaLineas.AsNoTracking().Where(x => ventaOps.Contains(x.Op))
+            .Select(x => new { x.Op, x.IdAmarre, x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto }).ToListAsync(ct);
+        var lineasCredito = await db.DocDevVentaLineas.AsNoTracking().Where(x => creditoOps.Contains(x.Op))
+            .Select(x => new { x.Op, x.IdAmarre, x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto }).ToListAsync(ct);
+
+        var idsItem = lineasVenta.Select(x => x.IdItem).Concat(lineasCredito.Select(x => x.IdItem))
+            .Where(x => x != null).Select(x => x!).Distinct().ToArray();
+        var idsCentro = lineasVenta.Select(x => x.IdCentroCosto).Concat(lineasCredito.Select(x => x.IdCentroCosto))
+            .Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToArray();
+        var clavesCentro = idsCentro.Select(x => x.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        var productos = await db.ItemCodigos.AsNoTracking().Where(x => idsItem.Contains(x.IdItem))
+            .ToDictionaryAsync(x => x.IdItem, x => x.Descripcion, ct);
+        var centros = await db.CentrosCosto.AsNoTracking().Where(x => clavesCentro.Contains(x.IdCentroCosto))
+            .ToDictionaryAsync(x => x.IdCentroCosto, x => x.Nombre, ct);
+
+        DetalleDocumentoVentaItem Mapear(string? idItem, decimal? cantidad, decimal? precio, decimal? importe, decimal? centro)
+        {
+            productos.TryGetValue(idItem ?? "", out var producto);
+            centros.TryGetValue(centro?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "", out var nombreCentro);
+            return new(idItem, cantidad, precio, importe, centro, producto, nombreCentro);
+        }
+
+        var detallesVenta = lineasVenta.GroupBy(x => x.Op).ToDictionary(g => g.Key,
+            g => (IReadOnlyList<DetalleDocumentoVentaItem>)g.OrderBy(x => x.IdAmarre)
+                .Select(x => Mapear(x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto)).ToList());
+        var detallesCredito = lineasCredito.GroupBy(x => x.Op).ToDictionary(g => g.Key,
+            g => (IReadOnlyList<DetalleDocumentoVentaItem>)g.OrderBy(x => x.IdAmarre)
+                .Select(x => Mapear(x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto)).ToList());
+
+        var conDetalle = items.Select(x => x with
+        {
+            Detalles = (x.Origen == "Nota de crédito" ? detallesCredito : detallesVenta)
+                .GetValueOrDefault(x.Op, Array.Empty<DetalleDocumentoVentaItem>())
+        }).ToList();
+        return new(conDetalle, total, pagina, tamano);
     }
 
-    public async Task<IReadOnlyList<DetalleDocumentoVentaItem>> DetalleAsync(decimal op, bool notaCredito, CancellationToken ct)
-    {
-        await using var db = CreateContext();
-        if (notaCredito)
-        {
-            return await (from linea in db.DocDevVentaLineas.AsNoTracking()
-                          where linea.Op == op
-                          join item0 in db.ItemCodigos.AsNoTracking() on linea.IdItem equals item0.IdItem into items
-                          from item in items.DefaultIfEmpty()
-                          join centro0 in db.CentrosCosto.AsNoTracking() on linea.IdCentroCosto!.Value.ToString() equals centro0.IdCentroCosto into centros
-                          from centro in centros.DefaultIfEmpty()
-                          select new DetalleDocumentoVentaItem(linea.IdItem, linea.Cantidad, linea.Precio, linea.Importe, linea.IdCentroCosto, item.Descripcion, centro.Nombre)).ToListAsync(ct);
-        }
-        return await (from linea in db.DocVentaLineas.AsNoTracking()
-                      where linea.Op == op
-                      join item0 in db.ItemCodigos.AsNoTracking() on linea.IdItem equals item0.IdItem into items
-                      from item in items.DefaultIfEmpty()
-                      join centro0 in db.CentrosCosto.AsNoTracking() on linea.IdCentroCosto!.Value.ToString() equals centro0.IdCentroCosto into centros
-                      from centro in centros.DefaultIfEmpty()
-                      select new DetalleDocumentoVentaItem(linea.IdItem, linea.Cantidad, linea.Precio, linea.Importe, linea.IdCentroCosto, item.Descripcion, centro.Nombre)).ToListAsync(ct);
-    }
 }
