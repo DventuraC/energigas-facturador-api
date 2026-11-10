@@ -17,7 +17,10 @@ public record DocumentoVentaItem(
     string? Serie, decimal? Numero, decimal Subtotal, decimal Igv, decimal Percepcion,
     decimal Total, string Estado, string? IdAgenda, string? AgendaNombre,
     DateTime? FechaReferencia, string? DocumentoReferencia, string? SerieReferencia, decimal? NumeroReferencia,
-    string? Observaciones);
+    string? Observaciones)
+{
+    public IReadOnlyList<DetalleDocumentoVentaItem> Detalles { get; init; } = [];
+}
 public record DocumentoTipoDisponible(decimal IdDocumento, string Nombre);
 public record PaginaDocumentosVenta(IReadOnlyList<DocumentoVentaItem> Items, int Total, int Pagina, int TamanoPagina);
 public record DetalleDocumentoVentaItem(string? IdItem, decimal? Cantidad, decimal? Precio, decimal? Importe, decimal? IdCentroCosto, string? Producto, string? CentroCosto);
