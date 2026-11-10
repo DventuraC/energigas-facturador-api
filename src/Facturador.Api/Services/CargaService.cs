@@ -55,8 +55,9 @@ public sealed class CargaService
     public bool Eliminar(Guid id) => _cargas.TryRemove(id, out _);
     public static DocumentoCargaEstado CrearEstado(int orden, DocumentoCarga documento, string estado, string? detalle) => new(
         orden, documento.Fecha, documento.FechaVencimiento, documento.TipoDocumento, documento.Serie, documento.Numero,
-        documento.MotivoNota, documento.Ruc, documento.Moneda, documento.Observacion, documento.SubTotal, documento.Impuesto,
-        documento.Total, estado, detalle);
+        documento.MotivoNota, documento.Ruc, documento.Moneda, documento.Observacion, Redondear(documento.SubTotal, 2), Redondear(documento.Impuesto, 2),
+        Redondear(documento.Total, 2), estado, detalle);
+    private static decimal? Redondear(decimal? valor, int decimales) => valor is null ? null : Math.Round(valor.Value, decimales, MidpointRounding.AwayFromZero);
     private static string Normalizar(string value) => new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     private static string? TextoOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetString();
     private static int? EnteroOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetValue<int>();

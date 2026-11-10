@@ -77,8 +77,8 @@ public sealed class SqlCargaService(IConfiguration configuration)
         command.Parameters.AddWithValue("@tipo", d.TipoDocumento); command.Parameters.AddWithValue("@serie", d.Serie); command.Parameters.AddWithValue("@numero", d.Numero);
         command.Parameters.AddWithValue("@motivo", (object?)d.MotivoNota ?? DBNull.Value); command.Parameters.AddWithValue("@ruc", (object?)d.Ruc ?? DBNull.Value);
         command.Parameters.AddWithValue("@moneda", (object?)d.Moneda ?? DBNull.Value); command.Parameters.AddWithValue("@observacion", (object?)d.Observacion ?? DBNull.Value);
-        command.Parameters.AddWithValue("@subtotal", (object?)d.SubTotal ?? DBNull.Value); command.Parameters.AddWithValue("@impuesto", (object?)d.Impuesto ?? DBNull.Value);
-        command.Parameters.AddWithValue("@total", (object?)d.Total ?? DBNull.Value); command.Parameters.AddWithValue("@serieRef", (object?)d.SerieReferencia ?? DBNull.Value);
+        AgregarDecimal(command, "@subtotal", d.SubTotal, 2); AgregarDecimal(command, "@impuesto", d.Impuesto, 2);
+        AgregarDecimal(command, "@total", d.Total, 2); command.Parameters.AddWithValue("@serieRef", (object?)d.SerieReferencia ?? DBNull.Value);
         command.Parameters.AddWithValue("@numeroRef", (object?)d.NumeroReferencia ?? DBNull.Value);
         return Convert.ToInt32(await command.ExecuteScalarAsync(ct));
     }
@@ -88,8 +88,16 @@ public sealed class SqlCargaService(IConfiguration configuration)
         const string sql = "INSERT INTO DocDetalle_Temp (Id_Cabecera,Id_Item,Cantidad,Precio,SubTotal_Item,Ccosto) VALUES (@cabecera,@item,@cantidad,@precio,@subtotal,@ccosto)";
         await using var command = new SqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("@cabecera", cabeceraId); command.Parameters.AddWithValue("@item", d.IdItem);
-        command.Parameters.AddWithValue("@cantidad", (object?)d.Cantidad ?? DBNull.Value); command.Parameters.AddWithValue("@precio", (object?)d.Precio ?? DBNull.Value);
-        command.Parameters.AddWithValue("@subtotal", (object?)d.SubTotalItem ?? DBNull.Value); command.Parameters.AddWithValue("@ccosto", (object?)d.Ccosto ?? DBNull.Value);
+        AgregarDecimal(command, "@cantidad", d.Cantidad, 2); AgregarDecimal(command, "@precio", d.Precio, 4);
+        AgregarDecimal(command, "@subtotal", d.SubTotalItem, 2); command.Parameters.AddWithValue("@ccosto", (object?)d.Ccosto ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(ct);
+    }
+
+    private static void AgregarDecimal(SqlCommand command, string nombre, decimal? valor, byte escala)
+    {
+        var parameter = command.Parameters.Add(nombre, SqlDbType.Decimal);
+        parameter.Precision = 18;
+        parameter.Scale = escala;
+        parameter.Value = valor is null ? DBNull.Value : Math.Round(valor.Value, escala, MidpointRounding.AwayFromZero);
     }
 }
