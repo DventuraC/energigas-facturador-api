@@ -26,7 +26,7 @@ public sealed class FacturadorDbContext(DbContextOptions<FacturadorDbContext> op
     }
 }
 
-public sealed class DocumentoTipo { public decimal IdDocumento { get; set; } public string Nombre { get; set; } = string.Empty; }
+public sealed class DocumentoTipo { public decimal IdDocumento { get; set; } public string Nombre { get; set; } = string.Empty; public string? DocSunat { get; set; } }
 public sealed class DocVenta { public decimal Op { get; set; } public DateTime Fecha { get; set; } public decimal Estado { get; set; } public decimal IdDocumento { get; set; } public string? Serie { get; set; } public decimal? Numero { get; set; } public string? IdAgenda { get; set; } public decimal SubTotal { get; set; } public decimal Impuestos { get; set; } public decimal? Percepcion { get; set; } public decimal Total { get; set; } public string? Observaciones { get; set; } public decimal? NdOp { get; set; } }
 public sealed class DocVentaLinea { public decimal IdAmarre { get; set; } public decimal Op { get; set; } public string? IdItem { get; set; } public decimal? Cantidad { get; set; } public decimal? Precio { get; set; } public decimal? Importe { get; set; } public decimal? IdCentroCosto { get; set; } }
 public sealed class DocDevVenta { public decimal Op { get; set; } public DateTime Fecha { get; set; } public decimal Estado { get; set; } public decimal IdDocumento { get; set; } public string? Serie { get; set; } public decimal? Numero { get; set; } public string? IdAgenda { get; set; } public decimal SubTotal { get; set; } public decimal Impuestos { get; set; } public decimal Total { get; set; } public string? Observaciones { get; set; } public decimal? OpDocVta { get; set; } }
