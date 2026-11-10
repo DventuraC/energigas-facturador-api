@@ -56,6 +56,15 @@ builder.Services.AddHttpClient("JwtAuthApi", client =>
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddScoped<JwtAuthClient>();
+builder.Services.Configure<FacturacionOptions>(builder.Configuration.GetSection("Facturacion"));
+builder.Services.AddHttpClient<FacturacionClient>(client =>
+{
+    var domain = builder.Configuration["Facturacion:Domain"] ?? "https://api.efacturas.pe";
+    if (!Uri.TryCreate(domain, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        throw new InvalidOperationException("Facturacion:Domain debe ser HTTPS");
+    client.BaseAddress = new Uri(domain.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddSingleton<CargaService>();
 builder.Services.AddScoped<SqlCargaService>();
 builder.Services.AddScoped<ConsultaVentasService>();
