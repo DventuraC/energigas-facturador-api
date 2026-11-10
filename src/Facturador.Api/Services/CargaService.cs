@@ -7,13 +7,14 @@ namespace Facturador.Api.Services;
 public sealed class CargaService
 {
     private readonly ConcurrentDictionary<Guid, IReadOnlyList<DocumentoCarga>> _cargas = new();
+    public const string NombreHojaRequerida = "cargaMasiva";
     private static readonly string[] Headers = ["fecha", "fechav", "tipodocumento", "serie", "numero", "motivonota", "ruc", "moneda", "observacion", "subtotal", "impuesto", "total", "serie", "numero", "iditem", "cantidad", "precio", "subtotal", "ccosto"];
 
     public ValidacionCargaResponse Validar(Stream archivo)
     {
         using var libro = new XLWorkbook(archivo);
-        var hoja = libro.Worksheets.FirstOrDefault(x => x.Name == "Hoja1");
-        if (hoja is null) return new(Guid.Empty, 0, ["No se encontró la hoja Hoja1."]);
+        var hoja = libro.Worksheets.FirstOrDefault(x => x.Name.Equals(NombreHojaRequerida, StringComparison.OrdinalIgnoreCase));
+        if (hoja is null) return new(Guid.Empty, 0, [$"No se encontró la hoja {NombreHojaRequerida}."]);
 
         var errores = new List<string>();
         for (var column = 1; column <= Headers.Length; column++)
@@ -48,6 +49,7 @@ public sealed class CargaService
     }
 
     public bool TryGet(Guid id, out IReadOnlyList<DocumentoCarga>? documentos) => _cargas.TryGetValue(id, out documentos);
+    public bool Eliminar(Guid id) => _cargas.TryRemove(id, out _);
     private static string Normalizar(string value) => new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     private static string? TextoOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetString();
     private static int? EnteroOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetValue<int>();

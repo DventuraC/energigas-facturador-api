@@ -25,6 +25,13 @@ public sealed class CargasController(CargaService cargaService, SqlCargaService 
         return Ok(await sqlCargaService.ProcesarAsync(documentos, cancellationToken));
     }
 
+    [HttpDelete("{id:guid}")]
+    public IActionResult Eliminar(Guid id)
+    {
+        cargaService.Eliminar(id);
+        return NoContent();
+    }
+
     [HttpPost("ejecutar-procedimiento")]
     public async Task<IActionResult> EjecutarProcedimiento(CancellationToken cancellationToken)
     {
