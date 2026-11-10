@@ -29,6 +29,9 @@ public sealed class JwtAuthClient(IOptions<JwtAuthApiConfiguration> config, IHtt
     public async Task<JwtLoginResult> LoginAsync(string email, string password, CancellationToken ct = default)
     {
         var payload = new JwtLoginRequest(_config.GrantType, _config.ClientId, _config.ClientSecret, email, password);
+        logger.LogInformation(
+            "Auth Client request: POST {AuthDomain}api/oauth/login | grantType={GrantType} | clientId={ClientId} | clientSecret=[REDACTED] | email={Email} | password=[REDACTED]",
+            _config.Domain.TrimEnd('/') + "/", _config.GrantType, _config.ClientId, MaskEmail(email));
         try
         {
             using var response = await factory.CreateClient("JwtAuthApi").PostAsJsonAsync("api/oauth/login", payload, ct);
@@ -51,5 +54,12 @@ public sealed class JwtAuthClient(IOptions<JwtAuthApiConfiguration> config, IHtt
             logger.LogError(ex, "Fallo al contactar el servicio de autenticación");
             return new(false, (int)HttpStatusCode.ServiceUnavailable, null, "Servicio de autenticación no disponible");
         }
+    }
+
+    private static string MaskEmail(string email)
+    {
+        var at = email.IndexOf('@');
+        if (at <= 1) return "[REDACTED]";
+        return $"{email[0]}***{email[at..]}";
     }
 }
