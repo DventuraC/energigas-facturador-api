@@ -13,8 +13,8 @@ public sealed class JwtAuthApiConfiguration
     public string ClientSecret { get; set; } = "";
 }
 
-public sealed record JwtLoginRequest(string GrantType, string ClientId, string ClientSecret, string Email, string Password, string? TrustedDeviceToken = null);
-public sealed record LoginInput(string Email, string Password, string? TrustedDeviceToken = null);
+public sealed record JwtLoginRequest(string GrantType, string ClientId, string ClientSecret, string Email, string Password);
+public sealed record LoginInput(string Email, string Password);
 public sealed record JwtLoginResult(bool IsSuccess, int StatusCode, JwtLoginResponse? Body, string? RawError);
 public sealed record JwtLoginResponse(string Status, JwtLoginTokens? Tokens, JwtMfaSetupRequired? Setup, JwtMfaChallenge? Challenge);
 public sealed record JwtLoginTokens(bool Success, string Message, string? AccessToken, string? RefreshToken, int? ExpiresIn);
@@ -26,9 +26,9 @@ public sealed class JwtAuthClient(IOptions<JwtAuthApiConfiguration> config, IHtt
 {
     private readonly JwtAuthApiConfiguration _config = config.Value;
 
-    public async Task<JwtLoginResult> LoginAsync(string email, string password, string? trustedDeviceToken = null, CancellationToken ct = default)
+    public async Task<JwtLoginResult> LoginAsync(string email, string password, CancellationToken ct = default)
     {
-        var payload = new JwtLoginRequest(_config.GrantType, _config.ClientId, _config.ClientSecret, email, password, trustedDeviceToken);
+        var payload = new JwtLoginRequest(_config.GrantType, _config.ClientId, _config.ClientSecret, email, password);
         try
         {
             using var response = await factory.CreateClient("JwtAuthApi").PostAsJsonAsync("api/oauth/login", payload, ct);

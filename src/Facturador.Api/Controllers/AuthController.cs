@@ -14,7 +14,7 @@ public sealed class AuthController(JwtAuthClient auth) : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(input.Email) || string.IsNullOrWhiteSpace(input.Password))
             return BadRequest(new { message = "Correo y contraseña son obligatorios" });
-        var result = await auth.LoginAsync(input.Email, input.Password, input.TrustedDeviceToken, ct);
+        var result = await auth.LoginAsync(input.Email, input.Password, ct);
         if (!result.IsSuccess)
             return StatusCode(result.StatusCode, new { message = result.RawError });
         return Ok(result.Body);
