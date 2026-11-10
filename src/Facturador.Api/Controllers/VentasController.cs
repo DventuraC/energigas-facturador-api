@@ -15,4 +15,8 @@ public sealed class VentasController(ConsultaVentasService consultas) : Controll
     [HttpGet("documentos")]
     public async Task<ActionResult<PaginaDocumentosVenta>> Documentos([FromQuery] FiltroDocumentosVenta filtro, CancellationToken ct)
         => Ok(await consultas.BuscarAsync(filtro, ct));
+
+    [HttpGet("documentos/{op:decimal}/detalle")]
+    public async Task<ActionResult<IReadOnlyList<DetalleDocumentoVentaItem>>> Detalle(decimal op, [FromQuery] bool notaCredito, CancellationToken ct)
+        => Ok(await consultas.DetalleAsync(op, notaCredito, ct));
 }

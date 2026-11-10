@@ -72,4 +72,26 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
             .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones)).ToListAsync(ct);
         return new(items, total, pagina, tamano);
     }
+
+    public async Task<IReadOnlyList<DetalleDocumentoVentaItem>> DetalleAsync(decimal op, bool notaCredito, CancellationToken ct)
+    {
+        await using var db = CreateContext();
+        if (notaCredito)
+        {
+            return await (from linea in db.DocDevVentaLineas.AsNoTracking()
+                          where linea.Op == op
+                          join item0 in db.ItemCodigos.AsNoTracking() on linea.IdItem equals item0.IdItem into items
+                          from item in items.DefaultIfEmpty()
+                          join centro0 in db.CentrosCosto.AsNoTracking() on linea.IdCentroCosto!.Value.ToString() equals centro0.IdCentroCosto into centros
+                          from centro in centros.DefaultIfEmpty()
+                          select new DetalleDocumentoVentaItem(linea.IdItem, linea.Cantidad, linea.Precio, linea.Importe, linea.IdCentroCosto, item.Descripcion, centro.Nombre)).ToListAsync(ct);
+        }
+        return await (from linea in db.DocVentaLineas.AsNoTracking()
+                      where linea.Op == op
+                      join item0 in db.ItemCodigos.AsNoTracking() on linea.IdItem equals item0.IdItem into items
+                      from item in items.DefaultIfEmpty()
+                      join centro0 in db.CentrosCosto.AsNoTracking() on linea.IdCentroCosto!.Value.ToString() equals centro0.IdCentroCosto into centros
+                      from centro in centros.DefaultIfEmpty()
+                      select new DetalleDocumentoVentaItem(linea.IdItem, linea.Cantidad, linea.Precio, linea.Importe, linea.IdCentroCosto, item.Descripcion, centro.Nombre)).ToListAsync(ct);
+    }
 }

@@ -20,3 +20,4 @@ public record DocumentoVentaItem(
     string? Observaciones);
 public record DocumentoTipoDisponible(decimal IdDocumento, string Nombre);
 public record PaginaDocumentosVenta(IReadOnlyList<DocumentoVentaItem> Items, int Total, int Pagina, int TamanoPagina);
+public record DetalleDocumentoVentaItem(string? IdItem, decimal? Cantidad, decimal? Precio, decimal? Importe, decimal? IdCentroCosto, string? Producto, string? CentroCosto);
