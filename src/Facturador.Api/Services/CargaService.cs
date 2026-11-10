@@ -14,7 +14,7 @@ public sealed class CargaService
     {
         using var libro = new XLWorkbook(archivo);
         var hoja = libro.Worksheets.FirstOrDefault(x => x.Name.Equals(NombreHojaRequerida, StringComparison.OrdinalIgnoreCase));
-        if (hoja is null) return new(Guid.Empty, 0, [$"No se encontró la hoja {NombreHojaRequerida}."]);
+        if (hoja is null) return new(Guid.Empty, 0, [$"No se encontró la hoja {NombreHojaRequerida}."], []);
 
         var errores = new List<string>();
         for (var column = 1; column <= Headers.Length; column++)
@@ -22,7 +22,7 @@ public sealed class CargaService
             var actual = Normalizar(hoja.Cell(2, column).GetString());
             if (actual != Headers[column - 1]) errores.Add($"Columna {column}: se esperaba {Headers[column - 1]}.");
         }
-        if (errores.Count > 0) return new(Guid.Empty, 0, errores);
+        if (errores.Count > 0) return new(Guid.Empty, 0, errores, []);
 
         var documentos = new List<DocumentoCarga>();
         foreach (var row in hoja.RowsUsed().Where(x => x.RowNumber() >= 3))
@@ -45,7 +45,8 @@ public sealed class CargaService
         if (documentos.Count == 0 && errores.Count == 0) errores.Add("El archivo no contiene documentos.");
         var id = Guid.NewGuid();
         if (errores.Count == 0) _cargas[id] = documentos;
-        return new(errores.Count == 0 ? id : Guid.Empty, documentos.Count, errores);
+        var vistaPrevia = documentos.Select((documento, index) => new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Pendiente", "Pendiente de cargar auxiliares.")).ToList();
+        return new(errores.Count == 0 ? id : Guid.Empty, documentos.Count, errores, vistaPrevia);
     }
 
     public bool TryGet(Guid id, out IReadOnlyList<DocumentoCarga>? documentos) => _cargas.TryGetValue(id, out documentos);

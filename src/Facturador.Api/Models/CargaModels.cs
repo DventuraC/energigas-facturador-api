@@ -7,5 +7,6 @@ public record DocumentoCarga(
     int? NumeroReferencia, long IdItem, decimal? Cantidad, decimal? Precio,
     decimal? SubTotalItem, int? Ccosto);
 
-public record ValidacionCargaResponse(Guid CargaId, int RegistrosValidos, IReadOnlyList<string> Errores);
-public record ResultadoProceso(int Insertados, int Duplicados, bool ProcedimientoEjecutado, string Mensaje);
+public record DocumentoCargaEstado(int Orden, DateTime Fecha, int TipoDocumento, string Serie, int Numero, string Estado, string? Detalle);
+public record ValidacionCargaResponse(Guid CargaId, int RegistrosValidos, IReadOnlyList<string> Errores, IReadOnlyList<DocumentoCargaEstado> Documentos);
+public record ResultadoProceso(int Insertados, int Duplicados, bool ProcedimientoEjecutado, string Mensaje, IReadOnlyList<DocumentoCargaEstado> Documentos);

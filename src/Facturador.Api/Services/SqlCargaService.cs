@@ -10,24 +10,31 @@ public sealed class SqlCargaService(IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("SqlServer");
         if (string.IsNullOrWhiteSpace(connectionString))
-            return new(0, 0, false, "Configura ConnectionStrings:SqlServer mediante secretos o variable de entorno.");
+            return new(0, 0, false, "Configura ConnectionStrings:SqlServer mediante secretos o variable de entorno.", []);
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         var insertados = 0;
         var duplicados = 0;
+        var resultados = new List<DocumentoCargaEstado>();
         try
         {
-            foreach (var documento in documentos)
+            foreach (var (documento, index) in documentos.Select((documento, index) => (documento, index)))
             {
-                if (await ExisteAsync(connection, transaction, documento, cancellationToken)) { duplicados++; continue; }
+                if (await ExisteAsync(connection, transaction, documento, cancellationToken))
+                {
+                    duplicados++;
+                    resultados.Add(new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Omitido", "Ya existe un documento con el mismo tipo, serie y número."));
+                    continue;
+                }
                 var cabeceraId = await InsertarCabeceraAsync(connection, transaction, documento, cancellationToken);
                 await InsertarDetalleAsync(connection, transaction, cabeceraId, documento, cancellationToken);
                 insertados++;
+                resultados.Add(new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Insertado", "Auxiliar creado correctamente."));
             }
             await transaction.CommitAsync(cancellationToken);
-            return new(insertados, duplicados, false, "Carga auxiliar completada. El procedimiento se ejecuta en una acción independiente.");
+            return new(insertados, duplicados, false, "Carga auxiliar completada. El procedimiento se ejecuta en una acción independiente.", resultados);
         }
         catch
         {
