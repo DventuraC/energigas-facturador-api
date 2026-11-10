@@ -19,6 +19,7 @@ public record DocumentoVentaItem(
     DateTime? FechaReferencia, string? DocumentoReferencia, string? SerieReferencia, decimal? NumeroReferencia,
     string? Observaciones)
 {
+    public string? DocSunat { get; init; }
     public IReadOnlyList<DetalleDocumentoVentaItem> Detalles { get; init; } = [];
 }
 public record DocumentoTipoDisponible(decimal IdDocumento, string Nombre);
