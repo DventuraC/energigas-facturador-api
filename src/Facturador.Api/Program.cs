@@ -1,10 +1,24 @@
 using Facturador.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 var authenticationEnabled = builder.Configuration.GetValue<bool>("Authentication:Enabled");
+var publicKeyPath = builder.Configuration["Authentication:PublicKeyPath"];
+RsaSecurityKey? jwtSigningKey = null;
+
+if (authenticationEnabled && !string.IsNullOrWhiteSpace(publicKeyPath))
+{
+    if (!File.Exists(publicKeyPath))
+        throw new InvalidOperationException("Authentication:PublicKeyPath no existe.");
+
+    var rsa = RSA.Create();
+    rsa.ImportFromPem(File.ReadAllText(publicKeyPath));
+    jwtSigningKey = new RsaSecurityKey(rsa);
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -62,8 +76,25 @@ if (authenticationEnabled)
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            options.Authority = builder.Configuration["Authentication:Authority"];
-            options.Audience = builder.Configuration["Authentication:Audience"];
+            if (jwtSigningKey is null)
+            {
+                options.Authority = builder.Configuration["Authentication:Authority"];
+                options.Audience = builder.Configuration["Authentication:Audience"];
+            }
+            else
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = jwtSigningKey,
+                    ValidateIssuer = true,
+                    ValidIssuer = builder.Configuration["Authentication:Authority"],
+                    ValidateAudience = true,
+                    ValidAudience = builder.Configuration["Authentication:Audience"],
+                    ValidateLifetime = true,
+                    RequireSignedTokens = true
+                };
+            }
         });
 }
 
