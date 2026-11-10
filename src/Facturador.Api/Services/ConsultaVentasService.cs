@@ -54,7 +54,7 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
              from r in referencias.DefaultIfEmpty()
              join rd0 in db.Documentos.AsNoTracking() on r.IdDocumento equals rd0.IdDocumento into documentosReferencia
              from rd in documentosReferencia.DefaultIfEmpty()
-             select new { Origen = "Venta", v.Op, v.Fecha, v.IdDocumento, Documento = d.Nombre, v.Serie, v.Numero, v.SubTotal, Igv = v.Impuestos, Percepcion = v.Percepcion ?? 0m, v.Total, v.Estado, v.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, v.Observaciones })
+             select new { Origen = "Venta", v.Op, v.Fecha, v.IdDocumento, Documento = d.Nombre, v.Serie, v.Numero, v.SubTotal, Igv = v.Impuestos, Percepcion = v.Percepcion ?? 0m, v.Total, v.Estado, v.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, v.Observaciones, d.DocSunat })
             .Concat(
              from nc in creditos
              join d in db.Documentos.AsNoTracking() on nc.IdDocumento equals d.IdDocumento
@@ -64,12 +64,12 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
              from r in referencias.DefaultIfEmpty()
              join rd0 in db.Documentos.AsNoTracking() on r.IdDocumento equals rd0.IdDocumento into documentosReferencia
              from rd in documentosReferencia.DefaultIfEmpty()
-             select new { Origen = "Nota de crédito", nc.Op, nc.Fecha, nc.IdDocumento, Documento = d.Nombre, nc.Serie, nc.Numero, nc.SubTotal, Igv = nc.Impuestos, Percepcion = 0m, nc.Total, nc.Estado, nc.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, nc.Observaciones });
+             select new { Origen = "Nota de crédito", nc.Op, nc.Fecha, nc.IdDocumento, Documento = d.Nombre, nc.Serie, nc.Numero, nc.SubTotal, Igv = nc.Impuestos, Percepcion = 0m, nc.Total, nc.Estado, nc.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, nc.Observaciones, d.DocSunat });
         var total = await documentos.CountAsync(ct);
         var pagina = Math.Max(1, filtro.Pagina);
         var tamano = Math.Clamp(filtro.TamanoPagina, 1, 100);
         var items = await documentos.OrderByDescending(x => x.Fecha).ThenByDescending(x => x.Op).Skip((pagina - 1) * tamano).Take(tamano)
-            .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones)).ToListAsync(ct);
+            .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones) { DocSunat = x.DocSunat }).ToListAsync(ct);
         // Fetch all details for the current page in batches, never one request per document.
         var ventaOps = items.Where(x => x.Origen == "Venta").Select(x => x.Op).Distinct().ToArray();
         var creditoOps = items.Where(x => x.Origen == "Nota de crédito").Select(x => x.Op).Distinct().ToArray();
