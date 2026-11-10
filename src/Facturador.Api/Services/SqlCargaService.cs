@@ -25,13 +25,13 @@ public sealed class SqlCargaService(IConfiguration configuration)
                 if (await ExisteAsync(connection, transaction, documento, cancellationToken))
                 {
                     duplicados++;
-                    resultados.Add(new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Omitido", "Ya existe un documento con el mismo tipo, serie y número."));
+                    resultados.Add(CargaService.CrearEstado(index + 1, documento, "Omitido", "Duplicado"));
                     continue;
                 }
                 var cabeceraId = await InsertarCabeceraAsync(connection, transaction, documento, cancellationToken);
                 await InsertarDetalleAsync(connection, transaction, cabeceraId, documento, cancellationToken);
                 insertados++;
-                resultados.Add(new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Insertado", "Auxiliar creado correctamente."));
+                resultados.Add(CargaService.CrearEstado(index + 1, documento, "Insertado", null));
             }
             await transaction.CommitAsync(cancellationToken);
             return new(insertados, duplicados, false, "Carga auxiliar completada. El procedimiento se ejecuta en una acción independiente.", resultados);

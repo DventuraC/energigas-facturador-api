@@ -45,12 +45,18 @@ public sealed class CargaService
         if (documentos.Count == 0 && errores.Count == 0) errores.Add("El archivo no contiene documentos.");
         var id = Guid.NewGuid();
         if (errores.Count == 0) _cargas[id] = documentos;
-        var vistaPrevia = documentos.Select((documento, index) => new DocumentoCargaEstado(index + 1, documento.Fecha, documento.TipoDocumento, documento.Serie, documento.Numero, "Pendiente", "Pendiente de cargar auxiliares.")).ToList();
+        var estado = errores.Count > 0 ? "Error" : "Pendiente";
+        var detalle = errores.Count > 0 ? "Formato o campos" : null;
+        var vistaPrevia = documentos.Select((documento, index) => CrearEstado(index + 1, documento, estado, detalle)).ToList();
         return new(errores.Count == 0 ? id : Guid.Empty, documentos.Count, errores, vistaPrevia);
     }
 
     public bool TryGet(Guid id, out IReadOnlyList<DocumentoCarga>? documentos) => _cargas.TryGetValue(id, out documentos);
     public bool Eliminar(Guid id) => _cargas.TryRemove(id, out _);
+    public static DocumentoCargaEstado CrearEstado(int orden, DocumentoCarga documento, string estado, string? detalle) => new(
+        orden, documento.Fecha, documento.FechaVencimiento, documento.TipoDocumento, documento.Serie, documento.Numero,
+        documento.MotivoNota, documento.Ruc, documento.Moneda, documento.Observacion, documento.SubTotal, documento.Impuesto,
+        documento.Total, estado, detalle);
     private static string Normalizar(string value) => new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     private static string? TextoOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetString();
     private static int? EnteroOpcional(IXLCell cell) => cell.IsEmpty() ? null : cell.GetValue<int>();
