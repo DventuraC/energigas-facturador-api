@@ -26,11 +26,11 @@ public sealed class AnulacionesController(IConfiguration config, FacturacionClie
             : await (from v in db.DocDevVentas.AsNoTracking() join t in db.Documentos.AsNoTracking() on v.IdDocumento equals t.IdDocumento where v.Op == solicitud.Op select new { v.Estado, v.Serie, v.Numero, t.DocSunat }).FirstOrDefaultAsync(ct);
         if (documento is null) return NotFound(new ResultadoAnulacion(false, "Documento no encontrado"));
         if (documento.Estado != 376m) return Conflict(new ResultadoAnulacion(false, "Error al anular el documento - El documento ya está anulado"));
-        if (string.IsNullOrWhiteSpace(documento.DocSunat) || string.IsNullOrWhiteSpace(documento.Serie) || !documento.Numero.HasValue)
+        if (!documento.DocSunat.HasValue || string.IsNullOrWhiteSpace(documento.Serie) || !documento.Numero.HasValue)
             return BadRequest(new ResultadoAnulacion(false, "Error al anular el documento - Faltan DocSunat, serie o número"));
         try
         {
-            var (ok, respuesta) = await facturacion.AnularAsync(documento.DocSunat.Trim(), documento.Serie.Trim(), documento.Numero.Value, ct);
+            var (ok, respuesta) = await facturacion.AnularAsync(documento.DocSunat.Value.ToString("00", System.Globalization.CultureInfo.InvariantCulture), documento.Serie.Trim(), documento.Numero.Value, ct);
             if (ok) return Ok(new ResultadoAnulacion(true, $"Documento {documento.Serie}-{documento.Numero:0} anulado con exito"));
             return StatusCode(502, new ResultadoAnulacion(false, $"Error al anular el documento - {respuesta}"));
         }
