@@ -38,7 +38,12 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
         if (!string.IsNullOrWhiteSpace(filtro.Serie)) { ventas = ventas.Where(x => x.Serie != null && x.Serie.Contains(filtro.Serie)); creditos = creditos.Where(x => x.Serie != null && x.Serie.Contains(filtro.Serie)); }
         if (filtro.Numero.HasValue) { ventas = ventas.Where(x => x.Numero == filtro.Numero); creditos = creditos.Where(x => x.Numero == filtro.Numero); }
         if (filtro.TiposDocumento?.Length > 0) { ventas = ventas.Where(x => filtro.TiposDocumento.Contains(x.IdDocumento)); creditos = creditos.Where(x => filtro.TiposDocumento.Contains(x.IdDocumento)); }
-        if (filtro.CentroCosto.HasValue) { ventas = ventas.Where(x => db.DocVentaLineas.Any(l => l.Op == x.Op && l.IdCentroCosto == filtro.CentroCosto)); creditos = creditos.Where(x => db.DocDevVentaLineas.Any(l => l.Op == x.Op && l.IdCentroCosto == filtro.CentroCosto)); }
+        if (!string.IsNullOrWhiteSpace(filtro.ClienteRuc))
+        {
+            var termino = filtro.ClienteRuc.Trim();
+            ventas = ventas.Where(x => x.IdAgenda != null && (x.IdAgenda.Contains(termino) || db.Agendas.Any(a => a.IdAgenda == x.IdAgenda && a.AgendaNombre != null && a.AgendaNombre.Contains(termino))));
+            creditos = creditos.Where(x => x.IdAgenda != null && (x.IdAgenda.Contains(termino) || db.Agendas.Any(a => a.IdAgenda == x.IdAgenda && a.AgendaNombre != null && a.AgendaNombre.Contains(termino))));
+        }
 
         var documentos =
             (from v in ventas
@@ -49,7 +54,7 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
              from r in referencias.DefaultIfEmpty()
              join rd0 in db.Documentos.AsNoTracking() on r.IdDocumento equals rd0.IdDocumento into documentosReferencia
              from rd in documentosReferencia.DefaultIfEmpty()
-             select new { Origen = "Venta", v.Op, v.Fecha, v.IdDocumento, Documento = d.Nombre, v.Serie, v.Numero, v.SubTotal, Igv = v.Impuestos, Percepcion = v.Percepcion ?? 0m, v.Total, v.Estado, v.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, v.Observaciones })
+             select new { Origen = "Venta", v.Op, v.Fecha, v.IdDocumento, Documento = d.Nombre, v.Serie, v.Numero, v.SubTotal, Igv = v.Impuestos, Percepcion = v.Percepcion ?? 0m, v.Total, v.Estado, v.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, v.Observaciones, d.DocSunat })
             .Concat(
              from nc in creditos
              join d in db.Documentos.AsNoTracking() on nc.IdDocumento equals d.IdDocumento
@@ -59,12 +64,50 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
              from r in referencias.DefaultIfEmpty()
              join rd0 in db.Documentos.AsNoTracking() on r.IdDocumento equals rd0.IdDocumento into documentosReferencia
              from rd in documentosReferencia.DefaultIfEmpty()
-             select new { Origen = "Nota de crédito", nc.Op, nc.Fecha, nc.IdDocumento, Documento = d.Nombre, nc.Serie, nc.Numero, nc.SubTotal, Igv = nc.Impuestos, Percepcion = 0m, nc.Total, nc.Estado, nc.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, nc.Observaciones });
+             select new { Origen = "Nota de crédito", nc.Op, nc.Fecha, nc.IdDocumento, Documento = d.Nombre, nc.Serie, nc.Numero, nc.SubTotal, Igv = nc.Impuestos, Percepcion = 0m, nc.Total, nc.Estado, nc.IdAgenda, AgendaNombre = a.AgendaNombre, FechaReferencia = (DateTime?)r.Fecha, DocumentoReferencia = rd.Nombre, SerieReferencia = r.Serie, NumeroReferencia = r.Numero, nc.Observaciones, d.DocSunat });
         var total = await documentos.CountAsync(ct);
         var pagina = Math.Max(1, filtro.Pagina);
         var tamano = Math.Clamp(filtro.TamanoPagina, 1, 100);
         var items = await documentos.OrderByDescending(x => x.Fecha).ThenByDescending(x => x.Op).Skip((pagina - 1) * tamano).Take(tamano)
-            .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones)).ToListAsync(ct);
-        return new(items, total, pagina, tamano);
+            .Select(x => new DocumentoVentaItem(x.Origen, x.Op, x.Fecha, x.IdDocumento, x.Documento, x.Serie, x.Numero, x.SubTotal, x.Igv, x.Percepcion, x.Total, x.Estado == 376m ? "Válido" : "Anulado", x.IdAgenda, x.AgendaNombre, x.FechaReferencia, x.DocumentoReferencia, x.SerieReferencia, x.NumeroReferencia, x.Observaciones) { DocSunat = x.DocSunat }).ToListAsync(ct);
+        // Fetch all details for the current page in batches, never one request per document.
+        var ventaOps = items.Where(x => x.Origen == "Venta").Select(x => x.Op).Distinct().ToArray();
+        var creditoOps = items.Where(x => x.Origen == "Nota de crédito").Select(x => x.Op).Distinct().ToArray();
+        var lineasVenta = await db.DocVentaLineas.AsNoTracking().Where(x => ventaOps.Contains(x.Op))
+            .Select(x => new { x.Op, x.IdAmarre, x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto }).ToListAsync(ct);
+        var lineasCredito = await db.DocDevVentaLineas.AsNoTracking().Where(x => creditoOps.Contains(x.Op))
+            .Select(x => new { x.Op, x.IdAmarre, x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto }).ToListAsync(ct);
+
+        var idsItem = lineasVenta.Select(x => x.IdItem).Concat(lineasCredito.Select(x => x.IdItem))
+            .Where(x => x != null).Select(x => x!).Distinct().ToArray();
+        var idsCentro = lineasVenta.Select(x => x.IdCentroCosto).Concat(lineasCredito.Select(x => x.IdCentroCosto))
+            .Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToArray();
+        var clavesCentro = idsCentro.Select(x => x.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        var productos = await db.ItemCodigos.AsNoTracking().Where(x => idsItem.Contains(x.IdItem))
+            .ToDictionaryAsync(x => x.IdItem, x => x.Descripcion, ct);
+        var centros = await db.CentrosCosto.AsNoTracking().Where(x => clavesCentro.Contains(x.IdCentroCosto))
+            .ToDictionaryAsync(x => x.IdCentroCosto, x => x.Nombre, ct);
+
+        DetalleDocumentoVentaItem Mapear(string? idItem, decimal? cantidad, decimal? precio, decimal? importe, decimal? centro)
+        {
+            productos.TryGetValue(idItem ?? "", out var producto);
+            centros.TryGetValue(centro?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "", out var nombreCentro);
+            return new(idItem, cantidad, precio, importe, centro, producto, nombreCentro);
+        }
+
+        var detallesVenta = lineasVenta.GroupBy(x => x.Op).ToDictionary(g => g.Key,
+            g => (IReadOnlyList<DetalleDocumentoVentaItem>)g.OrderBy(x => x.IdAmarre)
+                .Select(x => Mapear(x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto)).ToList());
+        var detallesCredito = lineasCredito.GroupBy(x => x.Op).ToDictionary(g => g.Key,
+            g => (IReadOnlyList<DetalleDocumentoVentaItem>)g.OrderBy(x => x.IdAmarre)
+                .Select(x => Mapear(x.IdItem, x.Cantidad, x.Precio, x.Importe, x.IdCentroCosto)).ToList());
+
+        var conDetalle = items.Select(x => x with
+        {
+            Detalles = (x.Origen == "Nota de crédito" ? detallesCredito : detallesVenta)
+                .GetValueOrDefault(x.Op, Array.Empty<DetalleDocumentoVentaItem>())
+        }).ToList();
+        return new(conDetalle, total, pagina, tamano);
     }
+
 }
