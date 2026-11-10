@@ -7,7 +7,7 @@ public sealed class FiltroDocumentosVenta
     public decimal[]? TiposDocumento { get; init; }
     public string? Serie { get; init; }
     public decimal? Numero { get; init; }
-    public decimal? CentroCosto { get; init; }
+    public string? ClienteRuc { get; init; }
     public int Pagina { get; init; } = 1;
     public int TamanoPagina { get; init; } = 25;
 }

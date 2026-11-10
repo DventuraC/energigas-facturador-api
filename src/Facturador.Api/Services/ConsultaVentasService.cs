@@ -38,7 +38,12 @@ public sealed class ConsultaVentasService(IConfiguration configuration)
         if (!string.IsNullOrWhiteSpace(filtro.Serie)) { ventas = ventas.Where(x => x.Serie != null && x.Serie.Contains(filtro.Serie)); creditos = creditos.Where(x => x.Serie != null && x.Serie.Contains(filtro.Serie)); }
         if (filtro.Numero.HasValue) { ventas = ventas.Where(x => x.Numero == filtro.Numero); creditos = creditos.Where(x => x.Numero == filtro.Numero); }
         if (filtro.TiposDocumento?.Length > 0) { ventas = ventas.Where(x => filtro.TiposDocumento.Contains(x.IdDocumento)); creditos = creditos.Where(x => filtro.TiposDocumento.Contains(x.IdDocumento)); }
-        if (filtro.CentroCosto.HasValue) { ventas = ventas.Where(x => db.DocVentaLineas.Any(l => l.Op == x.Op && l.IdCentroCosto == filtro.CentroCosto)); creditos = creditos.Where(x => db.DocDevVentaLineas.Any(l => l.Op == x.Op && l.IdCentroCosto == filtro.CentroCosto)); }
+        if (!string.IsNullOrWhiteSpace(filtro.ClienteRuc))
+        {
+            var termino = filtro.ClienteRuc.Trim();
+            ventas = ventas.Where(x => x.IdAgenda != null && (x.IdAgenda.Contains(termino) || db.Agendas.Any(a => a.IdAgenda == x.IdAgenda && a.AgendaNombre != null && a.AgendaNombre.Contains(termino))));
+            creditos = creditos.Where(x => x.IdAgenda != null && (x.IdAgenda.Contains(termino) || db.Agendas.Any(a => a.IdAgenda == x.IdAgenda && a.AgendaNombre != null && a.AgendaNombre.Contains(termino))));
+        }
 
         var documentos =
             (from v in ventas
